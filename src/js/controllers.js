@@ -4,11 +4,12 @@
 netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, socket, _, toastr) {
 
 	var MAX_BINS = 40;
+	var BLOCK_REWARD = 31.19582664;
 
 	// Main Stats init
 	// ---------------
 
-	$scope.frontierHash = '0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa';
+	$scope.frontierHash = '000000000000437482b6d47f82f374cde539440ddb108b0a76886f0d87d126b9';
 	$scope.nodesTotal = 0;
 	$scope.nodesActive = 0;
 	$scope.bestBlock = 0;
@@ -18,33 +19,38 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 	$scope.avgBlockTime = 0;
 	$scope.blockPropagationAvg = 0;
 	$scope.avgHashrate = 0;
-	$scope.uncleCount = 0;
+	$scope.pooledtx = 0;
+	$scope.supply = 0;
+	$scope.locked = 0;
+	$scope.blockReward = BLOCK_REWARD;
 	$scope.bestStats = {};
 
-	$scope.lastGasLimit = _.fill(Array(MAX_BINS), 2);
+	//$scope.lastGasLimit = _.fill(Array(MAX_BINS), 2);
 	$scope.lastBlocksTime = _.fill(Array(MAX_BINS), 2);
-	$scope.difficultyChart = _.fill(Array(MAX_BINS), 2);
+	$scope.freshstakeChart = _.fill(Array(MAX_BINS), 2);
+	$scope.votersChart = _.fill(Array(MAX_BINS), 2);
 	$scope.transactionDensity = _.fill(Array(MAX_BINS), 2);
-	$scope.gasSpending = _.fill(Array(MAX_BINS), 2);
+	//$scope.gasSpending = _.fill(Array(MAX_BINS), 2);
 	$scope.miners = [];
 
 
 	$scope.nodes = [];
+	$scope.peers = [];
 	$scope.map = [];
 	$scope.blockPropagationChart = [];
-	$scope.uncleCountChart = _.fill(Array(MAX_BINS), 2);
+	//$scope.uncleCountChart = _.fill(Array(MAX_BINS), 2);
 	$scope.coinbases = [];
 
 	$scope.latency = 0;
 
 	$scope.currentApiVersion = "0.1.0";
 
-	$scope.predicate = $localStorage.predicate || ['-pinned', '-stats.active', '-stats.block.number', 'stats.block.propagation'];
+	$scope.predicate = $localStorage.predicate || ['-pinned', '-stats.active', '-stats.block.height', 'stats.block.propagation'];
 	$scope.reverse = $localStorage.reverse || false;
 	$scope.pinned = $localStorage.pinned || [];
 
 	$scope.prefixPredicate = ['-pinned', '-stats.active'];
-	$scope.originalPredicate = ['-stats.block.number', 'stats.block.propagation'];
+	$scope.originalPredicate = ['-stats.block.height', 'stats.block.propagation'];
 
 	$scope.orderTable = function(predicate, reverse)
 	{
@@ -71,26 +77,26 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 		$localStorage.reverse = $scope.reverse;
 	}
 
-	$scope.pinNode = function(id)
-	{
-		index = findIndex({id: id});
+	// $scope.pinNode = function(id)
+	// {
+	// 	index = findIndex({id: id});
 
-		if( !_.isUndefined($scope.nodes[index]) )
-		{
-			$scope.nodes[index].pinned = !$scope.nodes[index].pinned;
+	// 	if( !_.isUndefined($scope.nodes[index]) )
+	// 	{
+	// 		$scope.nodes[index].pinned = !$scope.nodes[index].pinned;
 
-			if($scope.nodes[index].pinned)
-			{
-				$scope.pinned.push(id);
-			}
-			else
-			{
-				$scope.pinned.splice($scope.pinned.indexOf(id), 1);
-			}
-		}
+	// 		if($scope.nodes[index].pinned)
+	// 		{
+	// 			$scope.pinned.push(id);
+	// 		}
+	// 		else
+	// 		{
+	// 			$scope.pinned.splice($scope.pinned.indexOf(id), 1);
+	// 		}
+	// 	}
 
-		$localStorage.pinned = $scope.pinned;
-	}
+	// 	$localStorage.pinned = $scope.pinned;
+	// }
 
 	var timeout = setInterval(function ()
 	{
@@ -136,8 +142,8 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 		// filter data
 		data = xssFilter(data);
 
-		// console.log('Action: ', action);
-		// console.log('Data: ', data);
+		console.log('Action: ', action);
+		console.log('Data: ', data);
 
 		switch(action)
 		{
@@ -147,80 +153,56 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 				_.forEach($scope.nodes, function (node, index) {
 
 					// Init hashrate
-					if( _.isUndefined(node.stats.hashrate) )
-						node.stats.hashrate = 0;
+					// if( _.isUndefined(node.stats.hashrate) )
+					// 	node.stats.hashrate = 0;
 
-					// Init latency
+					// // Init latency
 					latencyFilter(node);
 
-					// Init history
-					if( _.isUndefined(data.history) )
-					{
-						data.history = new Array(40);
-						_.fill(data.history, -1);
-					}
+					// // Init history
+					// if( _.isUndefined(data.history) )
+					// {
+					// 	data.history = new Array(40);
+					// 	_.fill(data.history, -1);
+					// }
+
+					$scope.blockReward = getBlockReward(Math.ceil(node.stats.block.height / 6144) - 1, BLOCK_REWARD);
 
 					// Init or recover pin
-					node.pinned = ($scope.pinned.indexOf(node.id) >= 0 ? true : false);
+					// node.pinned = ($scope.pinned.indexOf(node.id) >= 0 ? true : false);
 				});
 
 				if( $scope.nodes.length > 0 )
 				{
 					toastr['success']("Got nodes list", "Got nodes!");
 
-					updateActiveNodes();
-				}
-
-				break;
-
-			case "add":
-				var index = findIndex({id: data.id});
-
-				// if( addNewNode(data) )
-				// 	toastr['success']("New node "+ $scope.nodes[findIndex({id: data.id})].info.name +" connected!", "New node!");
-				// else
-				// 	toastr['info']("Node "+ $scope.nodes[index].info.name +" reconnected!", "Node is back!");
-
-				break;
-
-			// TODO: Remove when everybody updates api client to 0.0.12
-			case "update":
-				var index = findIndex({id: data.id});
-
-				if( index >= 0 && !_.isUndefined($scope.nodes[index]) && !_.isUndefined($scope.nodes[index].stats) )
-				{
-					if( !_.isUndefined($scope.nodes[index].stats.latency) )
-						data.stats.latency = $scope.nodes[index].stats.latency;
-
-					if( _.isUndefined(data.stats.hashrate) )
-						data.stats.hashrate = 0;
-
-					if( $scope.nodes[index].stats.block.number < data.stats.block.number )
-					{
-						var best = _.max($scope.nodes, function (node) {
-							return parseInt(node.stats.block.number);
-						}).stats.block;
-
-						if (data.stats.block.number > best.number) {
-							data.stats.block.arrived = _.now();
-						} else {
-							data.stats.block.arrived = best.arrived;
-						}
-
-						$scope.nodes[index].history = data.history;
-					}
-
-					$scope.nodes[index].stats = data.stats;
-
-					if( !_.isUndefined(data.stats.latency) && _.get($scope.nodes[index], 'stats.latency', 0) !== data.stats.latency )
-					{
-						$scope.nodes[index].stats.latency = data.stats.latency;
-
-						latencyFilter($scope.nodes[index]);
-					}
-
 					updateBestBlock();
 				}
+
+				break;
+
+			case "peers":
+
+				$scope.peers = data.peers;
+				$scope.map = _.map($scope.peers, function (peer) {
+					// var fill = $filter('bubbleClass')(peer.stats, $scope.bestBlock);
+
+					if(peer.geo != null)
+						return {
+							radius: 3,
+							latitude: peer.geo.ll[0],
+							longitude: peer.geo.ll[1],
+							nodeName: peer.geo.city ? peer.geo.city + ", " + peer.geo.country : peer.addr + ", " + peer.geo.country ,
+							fillClass: "text-success",
+							fillKey: "success",
+						};
+					else
+						return {
+							radius: 0,
+							latitude: 0,
+							longitude: 0
+						};
+				});
 
 				break;
 
@@ -229,13 +211,13 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 
 				if( index >= 0 && !_.isUndefined($scope.nodes[index]) && !_.isUndefined($scope.nodes[index].stats) )
 				{
-					if( $scope.nodes[index].stats.block.number < data.block.number )
+					if( $scope.nodes[index].stats.block.height < data.block.height )
 					{
 						var best = _.max($scope.nodes, function (node) {
-							return parseInt(node.stats.block.number);
+							return parseInt(node.stats.block.height);
 						}).stats.block;
 
-						if (data.block.number > best.number) {
+						if (data.block.height > best.height) {
 							data.block.arrived = _.now();
 						} else {
 							data.block.arrived = best.arrived;
@@ -246,6 +228,7 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 
 					$scope.nodes[index].stats.block = data.block;
 					$scope.nodes[index].stats.propagationAvg = data.propagationAvg;
+					$scope.blockReward = getBlockReward(Math.ceil(data.block.height / 6144) - 1, BLOCK_REWARD);
 
 					updateBestBlock();
 				}
@@ -278,7 +261,6 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 						$scope.nodes[index].stats.mining = data.stats.mining;
 						$scope.nodes[index].stats.hashrate = data.stats.hashrate;
 						$scope.nodes[index].stats.peers = data.stats.peers;
-						$scope.nodes[index].stats.gasPrice = data.stats.gasPrice;
 						$scope.nodes[index].stats.uptime = data.stats.uptime;
 
 						if( !_.isUndefined(data.stats.latency) && _.get($scope.nodes[index], 'stats.latency', 0) !== data.stats.latency )
@@ -288,7 +270,7 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 							latencyFilter($scope.nodes[index]);
 						}
 
-						updateActiveNodes();
+						updateBestBlock();
 					}
 				}
 
@@ -307,62 +289,46 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 					// Init latency
 					latencyFilter($scope.nodes[index]);
 
-					updateActiveNodes();
+					updateBestBlock();
 				}
 
 				break;
 
-			case "blockPropagationChart":
-				$scope.blockPropagationChart = data.histogram;
-				$scope.blockPropagationAvg = data.avg;
-
-				break;
-
-			case "uncleCount":
-				$scope.uncleCount = data[0] + data[1];
-				data.reverse();
-				$scope.uncleCountChart = data;
+			case "mininginfo":
+				$scope.avgHashrate = data.networkhashps;
+				$scope.pooledtx = data.pooledtx;
 
 				break;
 
 			case "charts":
+
 				if( !_.isEqual($scope.avgBlockTime, data.avgBlocktime) )
 					$scope.avgBlockTime = data.avgBlocktime;
 
 				if( !_.isEqual($scope.avgHashrate, data.avgHashrate) )
 					$scope.avgHashrate = data.avgHashrate;
 
-				if( !_.isEqual($scope.lastGasLimit, data.gasLimit) && data.gasLimit.length >= MAX_BINS )
-					$scope.lastGasLimit = data.gasLimit;
-
-				if( !_.isEqual($scope.lastBlocksTime, data.blocktime) && data.blocktime.length >= MAX_BINS )
+				if( !_.isEqual($scope.lastBlocksTime, data.blocktime) && data.blocktime.length >= MAX_BINS ) 
 					$scope.lastBlocksTime = data.blocktime;
 
-				if( !_.isEqual($scope.difficultyChart, data.difficulty) && data.difficulty.length >= MAX_BINS )
-					$scope.difficultyChart = data.difficulty;
+				if( !_.isEqual($scope.freshstakeChart, data.freshstake) && data.freshstake.length >= MAX_BINS )
+					$scope.freshstakeChart = data.freshstake;
 
-				if( !_.isEqual($scope.blockPropagationChart, data.propagation.histogram) ) {
-					$scope.blockPropagationChart = data.propagation.histogram;
-					$scope.blockPropagationAvg = data.propagation.avg;
-				}
+				if( !_.isEqual($scope.votersChart, data.voters) && data.voters.length >= MAX_BINS )
+					$scope.votersChart = data.voters;
 
-				data.uncleCount.reverse();
-
-				if( !_.isEqual($scope.uncleCountChart, data.uncleCount) && data.uncleCount.length >= MAX_BINS ) {
-					$scope.uncleCount = data.uncleCount[data.uncleCount.length-2] + data.uncleCount[data.uncleCount.length-1];
-					$scope.uncleCountChart = data.uncleCount;
-				}
+				$scope.supply = Math.round(data.supply / 100000000).toString().replace(/(\d)(?=(\d\d\d)+([^\d]|$))/g, '$1 ');
+				$scope.locked = Math.round(data.locked).toString().replace(/(\d)(?=(\d\d\d)+([^\d]|$))/g, '$1 ');
 
 				if( !_.isEqual($scope.transactionDensity, data.transactions) && data.transactions.length >= MAX_BINS )
 					$scope.transactionDensity = data.transactions;
 
-				if( !_.isEqual($scope.gasSpending, data.gasSpending) && data.gasSpending.length >= MAX_BINS )
-					$scope.gasSpending = data.gasSpending;
+				var bestHeight = _.max($scope.nodes, function (node)
+				{
+					return parseInt(node.stats.block.height);
+				}).stats.block.height;
 
-				if( !_.isEqual($scope.miners, data.miners) ) {
-					$scope.miners = data.miners;
-					getMinersNames();
-				}
+				$scope.blockReward = getBlockReward(Math.ceil(bestHeight / 6144) - 1, BLOCK_REWARD);
 
 				break;
 
@@ -376,7 +342,7 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 
 					// toastr['error']("Node "+ $scope.nodes[index].info.name +" went away!", "Node connection was lost!");
 
-					updateActiveNodes();
+					updateBestBlock();
 				}
 
 				break;
@@ -437,80 +403,6 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 		}
 	}
 
-	function addNewNode(data)
-	{
-		var index = findIndex({id: data.id});
-
-		if( _.isUndefined(data.history) )
-		{
-			data.history = new Array(40);
-			_.fill(data.history, -1);
-		}
-
-		if( index < 0 )
-		{
-			if( !_.isUndefined(data.stats) && _.isUndefined(data.stats.hashrate) )
-			{
-				data.stats.hashrate = 0;
-			}
-
-			data.pinned = false;
-
-			$scope.nodes.push(data);
-
-			return true;
-		}
-
-		data.pinned = ( !_.isUndefined($scope.nodes[index].pinned) ? $scope.nodes[index].pinned : false);
-
-		if( !_.isUndefined($scope.nodes[index].history) )
-		{
-			data.history = $scope.nodes[index].history;
-		}
-
-		$scope.nodes[index] = data;
-
-		updateActiveNodes();
-
-		return false;
-	}
-
-	function updateActiveNodes()
-	{
-		updateBestBlock();
-
-		$scope.nodesTotal = $scope.nodes.length;
-
-		$scope.nodesActive = _.filter($scope.nodes, function (node) {
-			// forkFilter(node);
-			return node.stats.active == true;
-		}).length;
-
-		$scope.upTimeTotal = _.reduce($scope.nodes, function (total, node) {
-			return total + node.stats.uptime;
-		}, 0) / $scope.nodes.length;
-
-		$scope.map = _.map($scope.nodes, function (node) {
-			var fill = $filter('bubbleClass')(node.stats, $scope.bestBlock);
-
-			if(node.geo != null)
-				return {
-					radius: 3,
-					latitude: node.geo.ll[0],
-					longitude: node.geo.ll[1],
-					nodeName: node.info.name,
-					fillClass: "text-" + fill,
-					fillKey: fill,
-				};
-			else
-				return {
-					radius: 0,
-					latitude: 0,
-					longitude: 0
-				};
-		});
-	}
-
 	function updateBestBlock()
 	{
 		if( $scope.nodes.length )
@@ -518,95 +410,34 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 			var chains = {};
 			var maxScore = 0;
 
-			// _($scope.nodes)
-			// 	.map(function (item)
-			// 	{
-			// 		maxScore += (item.trusted ? 50 : 1);
-
-			// 		if( _.isUndefined(chains[item.stats.block.number]) )
-			// 			chains[item.stats.block.number] = [];
-
-			// 		if( _.isUndefined(chains[item.stats.block.number][item.stats.block.fork]) )
-			// 			chains[item.stats.block.number][item.stats.block.fork] = {
-			// 				fork: item.stats.block.fork,
-			// 				count: 0,
-			// 				trusted: 0,
-			// 				score: 0
-			// 			};
-
-			// 		if(item.stats.block.trusted)
-			// 			chains[item.stats.block.number][item.stats.block.fork].trusted++;
-			// 		else
-			// 			chains[item.stats.block.number][item.stats.block.fork].count++;
-
-			// 		chains[item.stats.block.number][item.stats.block.fork].score = chains[item.stats.block.number][item.stats.block.fork].trusted * 50 + chains[item.stats.block.number][item.stats.block.fork].count;
-			// 	})
-			// 	.value();
-
-			// $scope.maxScore = maxScore;
-			// $scope.chains = _.reduce(chains, function (result, item, key)
-			// {
-			// 	result[key] = _.max(item, 'score');
-			// 	return result;
-			// }, {});
-
 			var bestBlock = _.max($scope.nodes, function (node)
 			{
-				// if( $scope.chains[node.stats.block.number].fork === node.stats.block.fork && $scope.chains[node.stats.block.number].score / $scope.maxScore >= 0.5 )
-				// {
-					return parseInt(node.stats.block.number);
-				// }
-
-				// return 0;
-			}).stats.block.number;
+					return parseInt(node.stats.block.height);
+			}).stats.block.height;
 
 			if( bestBlock !== $scope.bestBlock )
 			{
 				$scope.bestBlock = bestBlock;
 				$scope.bestStats = _.max($scope.nodes, function (node) {
-					return parseInt(node.stats.block.number);
+					return parseInt(node.stats.block.height);
 				}).stats;
 
 				$scope.lastBlock = $scope.bestStats.block.arrived;
+				$scope.lastDifficulty = $scope.bestStats.block.difficulty;
 				$scope.lastDifficulty = $scope.bestStats.block.difficulty;
 			}
 		}
 	}
 
-	// function forkFilter(node)
-	// {
-	// 	if( _.isUndefined(node.readable) )
-	// 		node.readable = {};
-
-	// 	node.readable.forkClass = 'hidden';
-	// 	node.readable.forkMessage = '';
-
-	// 	return true;
-
-	// 	if( $scope.chains[node.stats.block.number].fork === node.stats.block.fork && $scope.chains[node.stats.block.number].score / $scope.maxScore >= 0.5 )
-	// 	{
-	// 		node.readable.forkClass = 'hidden';
-	// 		node.readable.forkMessage = '';
-
-	// 		return true;
-	// 	}
-
-	// 	if( $scope.chains[node.stats.block.number].fork !== node.stats.block.fork )
-	// 	{
-	// 		node.readable.forkClass = 'text-danger';
-	// 		node.readable.forkMessage = 'Wrong chain.<br/>This chain is a fork.';
-
-	// 		return false;
-	// 	}
-
-	// 	if( $scope.chains[node.stats.block.number].score / $scope.maxScore < 0.5)
-	// 	{
-	// 		node.readable.forkClass = 'text-warning';
-	// 		node.readable.forkMessage = 'May not be main chain.<br/>Waiting for more confirmations.';
-
-	// 		return false;
-	// 	}
-	// }
+	function getBlockReward(cycles, reward) {
+		if (cycles <= 0) return reward;
+	  if (cycles) {
+	    reward = reward * 100/101;
+	    return getBlockReward(cycles - 1, reward);
+	  } else {
+	    return reward;
+	  }
+	}
 
 	function latencyFilter(node)
 	{

@@ -2,61 +2,26 @@ var _ = require('lodash');
 var logger = require('./lib/utils/logger');
 var chalk = require('chalk');
 var http = require('http');
+var fs = require('fs');
+var WebSocket = require('ws');
+var exec = require('child_process').exec;
 
-// Init WS SECRET
-var WS_SECRET;
+// use mainnet by default
+var env = process.env.NODE_ENV || "production";
+var config = require('./lib/utils/config.json')[env];
 
-if( !_.isUndefined(process.env.WS_SECRET) && !_.isNull(process.env.WS_SECRET) )
-{
-	if( process.env.WS_SECRET.indexOf('|') > 0 )
-	{
-		WS_SECRET = process.env.WS_SECRET.split('|');
-	}
-	else
-	{
-		WS_SECRET = [process.env.WS_SECRET];
-	}
-}
-else
-{
-	try {
-		var tmp_secret_json = require('./ws_secret.json');
-		WS_SECRET = _.values(tmp_secret_json);
-	}
-	catch (e)
-	{
-		console.error("WS_SECRET NOT SET!!!");
-	}
-}
+var rpc_cert = fs.readFileSync(config.cert_path);
+var rpc_user = config.user;
+var rpc_password = config.pass;
 
-var banned = require('./lib/utils/config').banned;
-
-// Init http server
-if( process.env.NODE_ENV !== 'production' )
-{
-	var app = require('./lib/express');
-	server = http.createServer(app);
-}
-else
-	server = http.createServer();
+var app = require('./lib/express');
+server = http.createServer(app);
 
 // Init socket vars
 var Primus = require('primus');
 var api;
 var client;
 var server;
-
-
-// Init API Socket connection
-api = new Primus(server, {
-	transformer: 'websockets',
-	pathname: '/api',
-	parser: 'JSON'
-});
-
-api.use('emit', require('primus-emit'));
-api.use('spark-latency', require('primus-spark-latency'));
-
 
 // Init Client Socket connection
 client = new Primus(server, {
@@ -67,19 +32,13 @@ client = new Primus(server, {
 
 client.use('emit', require('primus-emit'));
 
-
-// Init external API
-external = new Primus(server, {
-	transformer: 'websockets',
-	pathname: '/external',
-	parser: 'JSON'
-});
-
-external.use('emit', require('primus-emit'));
-
 // Init collections
 var Collection = require('./lib/collection');
-var Nodes = new Collection(external);
+var Nodes = new Collection();
+Nodes.add( {id : 'localhost'}, function (err, info)
+{
+	if (err) console.error(err);
+});
 
 Nodes.setChartsCallback(function (err, charts)
 {
@@ -96,276 +55,98 @@ Nodes.setChartsCallback(function (err, charts)
 	}
 });
 
+// Initiate the websocket connection.  The dcrd generated certificate acts as
+// its own certificate authority, so it needs to be specified in the 'ca' array
+// for the certificate to properly validate.
+var ws = new WebSocket('wss://'+config.host+':'+config.port+'/ws', {
+  headers: {
+    'Authorization': 'Basic '+new Buffer(rpc_user+':'+rpc_password).toString('base64')
+  },
+  cert: rpc_cert,
+  ca: [rpc_cert]
+});
+ws.on('open', function() {
+    console.log('CONNECTED');
+    // Send a JSON-RPC command to be notified when blocks are connected and
+    // disconnected from the chain.
+    ws.send('{"jsonrpc":"1.0","id":"0","method":"notifyblocks","params":[]}');
+    
+    /* Seed local storage with initial data on restart */
+    getPeerInfo();
+    updateSupply();
+    updateLocked();
 
-// Init API Socket events
-api.on('connection', function (spark)
-{
-	console.info('API', 'CON', 'Open:', spark.address.ip);
+    /* Update peer list each minute */
+    var activeNodesInterval = setInterval(getPeerInfo, 60000);
 
-	spark.on('hello', function (data)
-	{
-		console.info('API', 'CON', 'Hello', data['id']);
+    /* Update locked DCR in PoS each 5 minutes */
+    var lockedCoinsInterval = setInterval(updateLocked, 5 * 60000);
 
-		if( _.isUndefined(data.secret) || WS_SECRET.indexOf(data.secret) === -1 || banned.indexOf(spark.address.ip) >= 0 )
-		{
-			spark.end(undefined, { reconnect: false });
-			console.error('API', 'CON', 'Closed - wrong auth', data);
+    var hashrateCheck = setInterval( function () {
+			ws.send('{"jsonrpc":"1.0","id":"0","method":"getmininginfo","params":[]}');
+		}, 60000);
 
-			return false;
-		}
-
-		if( !_.isUndefined(data.id) && !_.isUndefined(data.info) )
-		{
-			data.ip = spark.address.ip;
-			data.spark = spark.id;
-			data.latency = spark.latency || 0;
-
-			Nodes.add( data, function (err, info)
-			{
-				if(err !== null)
-				{
-					console.error('API', 'CON', 'Connection error:', err);
-					return false;
-				}
-
-				if(info !== null)
-				{
-					spark.emit('ready');
-
-					console.success('API', 'CON', 'Connected', data.id);
-
-					client.write({
-						action: 'add',
-						data: info
-					});
-				}
-			});
-		}
-	});
-
-
-	spark.on('update', function (data)
-	{
-		if( !_.isUndefined(data.id) && !_.isUndefined(data.stats) )
-		{
-			Nodes.update(data.id, data.stats, function (err, stats)
-			{
-				if(err !== null)
-				{
-					console.error('API', 'UPD', 'Update error:', err);
-				}
-				else
-				{
-					if(stats !== null)
-					{
-						client.write({
-							action: 'update',
-							data: stats
-						});
-
-						console.info('API', 'UPD', 'Update from:', data.id, 'for:', stats);
-
-						Nodes.getCharts();
-					}
-				}
-			});
-		}
-		else
-		{
-			console.error('API', 'UPD', 'Update error:', data);
-		}
-	});
-
-
-	spark.on('block', function (data)
-	{
-		if( !_.isUndefined(data.id) && !_.isUndefined(data.block) )
-		{
-			Nodes.addBlock(data.id, data.block, function (err, stats)
-			{
-				if(err !== null)
-				{
-					console.error('API', 'BLK', 'Block error:', err);
-				}
-				else
-				{
-					if(stats !== null)
-					{
-						client.write({
-							action: 'block',
-							data: stats
-						});
-
-						console.success('API', 'BLK', 'Block:', data.block['number'], 'from:', data.id);
-
-						Nodes.getCharts();
-					}
-				}
-			});
-		}
-		else
-		{
-			console.error('API', 'BLK', 'Block error:', data);
-		}
-	});
-
-
-	spark.on('pending', function (data)
-	{
-		if( !_.isUndefined(data.id) && !_.isUndefined(data.stats) )
-		{
-			Nodes.updatePending(data.id, data.stats, function (err, stats) {
-				if(err !== null)
-				{
-					console.error('API', 'TXS', 'Pending error:', err);
-				}
-
-				if(stats !== null)
-				{
-					client.write({
-						action: 'pending',
-						data: stats
-					});
-
-					console.success('API', 'TXS', 'Pending:', data.stats['pending'], 'from:', data.id);
-				}
-			});
-		}
-		else
-		{
-			console.error('API', 'TXS', 'Pending error:', data);
-		}
-	});
-
-
-	spark.on('stats', function (data)
-	{
-		if( !_.isUndefined(data.id) && !_.isUndefined(data.stats) )
-		{
-
-			Nodes.updateStats(data.id, data.stats, function (err, stats)
-			{
-				if(err !== null)
-				{
-					console.error('API', 'STA', 'Stats error:', err);
-				}
-				else
-				{
-					if(stats !== null)
-					{
-						client.write({
-							action: 'stats',
-							data: stats
-						});
-
-						console.success('API', 'STA', 'Stats from:', data.id);
-					}
-				}
-			});
-		}
-		else
-		{
-			console.error('API', 'STA', 'Stats error:', data);
-		}
-	});
-
-
-	spark.on('history', function (data)
-	{
-		console.success('API', 'HIS', 'Got history from:', data.id);
-
-		var time = chalk.reset.cyan((new Date()).toJSON()) + " ";
-		console.time(time, 'COL', 'CHR', 'Got charts in');
-
-		Nodes.addHistory(data.id, data.history, function (err, history)
-		{
-			console.timeEnd(time, 'COL', 'CHR', 'Got charts in');
-
-			if(err !== null)
-			{
-				console.error('COL', 'CHR', 'History error:', err);
-			}
-			else
-			{
-				client.write({
-					action: 'charts',
-					data: history
-				});
-			}
-		});
-	});
-
-
-	spark.on('node-ping', function (data)
-	{
-		var start = (!_.isUndefined(data) && !_.isUndefined(data.clientTime) ? data.clientTime : null);
-
-		spark.emit('node-pong', {
-			clientTime: start,
-			serverTime: _.now()
-		});
-
-		console.info('API', 'PIN', 'Ping from:', data['id']);
-	});
-
-
-	spark.on('latency', function (data)
-	{
-		if( !_.isUndefined(data.id) )
-		{
-			Nodes.updateLatency(data.id, data.latency, function (err, latency)
-			{
-				if(err !== null)
-				{
-					console.error('API', 'PIN', 'Latency error:', err);
-				}
-
-				if(latency !== null)
-				{
-					// client.write({
-					// 	action: 'latency',
-					// 	data: latency
-					// });
-
-					console.info('API', 'PIN', 'Latency:', latency, 'from:', data.id);
-				}
-			});
-
-			if( Nodes.requiresUpdate(data.id) )
-			{
-				var range = Nodes.getHistory().getHistoryRequestRange();
-
-				spark.emit('history', range);
-				console.info('API', 'HIS', 'Asked:', data.id, 'for history:', range.min, '-', range.max);
-
-				Nodes.askedForHistory(true);
-			}
-		}
-	});
-
-
-	spark.on('end', function (data)
-	{
-		Nodes.inactive(spark.id, function (err, stats)
-		{
-			if(err !== null)
-			{
-				console.error('API', 'CON', 'Connection end error:', err);
-			}
-			else
-			{
-				client.write({
-					action: 'inactive',
-					data: stats
-				});
-
-				console.warn('API', 'CON', 'Connection with:', spark.id, 'ended:', data);
-			}
-		});
-	});
 });
 
+ws.on('message', function(data, flags) {
+    try {
+    	data = JSON.parse(data);
+    } catch(e) {
+    	console.log(e);
+    	return;
+    }
 
+    if (data.params) { 
+    	ws.send('{"jsonrpc":"1.0","id":"0","method":"getblock","params":["'+data.params[0]+'"]}'); 
+    	return; 
+    }
+    
+		 block = data.result;
+		 if (block && block.height) {
+
+        updateSupply();
+
+			  Nodes.addBlock('localhost', block, function (err, stats)
+				{
+					if(err !== null)
+					{
+						console.error('API', 'BLK', 'Block error:', err);
+					}
+					else
+					{
+						if(stats !== null)
+						{
+							client.write({
+								action: 'block',
+								data: stats
+							});
+
+							console.success('API', 'BLK', 'Block:', block['height']);
+
+							Nodes.getCharts();
+						}
+					}
+				});
+			} else if (block && block.networkhashps && block.pooledtx) {
+				Nodes.updateMiningInfo(block, function (err, stats) {
+					if(err !== null)
+					{
+						console.error('API', 'BLK', 'MiningInfo error:', err);
+					} else {
+						client.write({
+							action: 'mininginfo',
+							data: stats
+						});
+					}
+				});
+			}
+});
+ws.on('error', function(derp) {
+  console.log('ERROR:' + derp);
+})
+ws.on('close', function(data) {
+  console.log('DISCONNECTED');
+})
 
 client.on('connection', function (clientSpark)
 {
@@ -374,6 +155,7 @@ client.on('connection', function (clientSpark)
 		clientSpark.emit('init', { nodes: Nodes.all() });
 
 		Nodes.getCharts();
+    client.write({ action: 'peers', data: {peers : Nodes.peers()} });
 	});
 
 	clientSpark.on('client-pong', function (data)
@@ -395,7 +177,6 @@ var latencyTimeout = setInterval( function ()
 	});
 }, 5000);
 
-
 // Cleanup old inactive nodes
 var nodeCleanupTimeout = setInterval( function ()
 {
@@ -407,6 +188,76 @@ var nodeCleanupTimeout = setInterval( function ()
 	Nodes.getCharts();
 
 }, 1000*60*60);
+
+function updateSupply () {
+
+  exec('dcrctl getcoinsupply', function(error, stdout, stderr) {
+    if (error || stderr) {
+      console.error(error, stderr); return next(error, null);
+    }
+    try {
+      var data = JSON.parse(stdout);
+    } catch(e) {
+      console.log('dcrctl getcoinsupply error');
+      return;
+    }
+      Nodes.updateSupply(data, function (err, stats) {
+        if(err !== null)
+        {
+          console.error('API', 'UPD', 'updateSupply error:', err);
+        } else {
+          console.success('API', 'UPD', 'Updated availiable supply');
+          return;
+        }
+      });
+  });
+}
+
+function updateLocked () {
+  exec('dcrctl getticketpoolvalue', function(error, stdout, stderr) {
+    if (error || stderr) {
+      console.error(error, stderr); return next(error, null);
+    }
+    try {
+      var data = JSON.parse(stdout);
+    } catch(e) {
+      console.log('dcrctl getticketpoolvalue error');
+      return;
+    }
+      Nodes.updateLocked(data, function (err, stats) {
+        if(err !== null)
+        {
+          console.error('API', 'UPD', 'updateLocked error:', err);
+        } else {
+          console.success('API', 'UPD', 'Updated locked coins');
+          return;
+        }
+      });
+  });
+}
+
+function getPeerInfo() {
+  
+  exec('dcrctl getpeerinfo', function(error, stdout, stderr) {
+    if (error || stderr) {
+      console.error(error, stderr); return next(error, null);
+    }
+    try {
+      var data = JSON.parse(stdout);
+    } catch(e) {
+      console.log('dcrctl getpeerinfo error');
+      return;
+    }
+    Nodes.updatePeers(data, function(err, peers) {
+      if (err) { 
+        console.log(err);
+      } else {
+        console.success('API', 'UPD', 'Updated peers');
+      }
+      client.write({ action: 'peers', data: {peers : Nodes.peers()} });
+    });
+  });
+}
 
 server.listen(process.env.PORT || 3000);
 

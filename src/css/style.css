@@ -1,3 +1,15 @@
+@font-face {
+	font-family: "decred";
+	src: url("/fonts/minimal-decred.woff2") format("woff2"),
+	     url("/fonts/minimal-decred.ttf") format("truetype");
+}
+
+.decred-font-logo {
+	font-family:'decred' !important;
+	font-weight:100 !important;
+	font-style:normal !important;
+}
+
 html {
 	width: 100%;
 }
@@ -161,6 +173,10 @@ span.small-title span.small {
 
 .big-info.chart.double-chart {
 	height: 242px;
+}
+
+.bottom-stats {
+	height: 120px;
 }
 
 .blocks-holder {
@@ -410,6 +426,11 @@ nodepropagchart {
 
 .hoverinfo .propagationBox {
 	top: 3px;
+}
+
+.smaller-text {
+	font-size: 30px;
+  letter-spacing: -2px;
 }
 
 svg {

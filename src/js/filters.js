@@ -4,18 +4,7 @@
 angular.module('netStatsApp.filters', [])
 .filter('nodesActiveClass', function() {
 	return function(active, total) {
-		var ratio = active/total;
-
-		if(ratio >= 0.9)
 			return 'text-success';
-
-		if(ratio >= 0.75)
-			return 'text-info';
-
-		if(ratio >= 0.5)
-			return 'text-warning';
-
-		return 'text-danger';
 	};
 })
 .filter('nodePinClass', function() {
@@ -29,6 +18,11 @@ angular.module('netStatsApp.filters', [])
 .filter('mainClass', function() {
 	return function(node, bestBlock) {
 	  	return mainClass(node, bestBlock);
+	};
+})
+.filter('blockHeight', function() {
+	return function(height, bestBlock) {
+	  	return blockHeight(height, bestBlock);
 	};
 })
 .filter('peerClass', function() {
@@ -168,38 +162,6 @@ angular.module('netStatsApp.filters', [])
 		return (best - current.block.number < 1 ? 'text-success' : (best - current.block.number === 1 ? 'text-warning' : (best - current.block.number > 1 && best - current.block.number < 4 ? 'text-orange' : 'text-danger')));
 	};
 })
-.filter('gasPriceFilter', ['$filter', function(filter) {
-	var numberFilter = filter('number');
-	return function(price) {
-		if(typeof price === 'undefined')
-			return "0 wei";
-
-		if(price.length < 4)
-			return numberFilter(price) + " wei";
-
-		if(price.length < 7)
-			return numberFilter(price/1000) + " kwei";
-
-		if(price.length < 10)
-			return numberFilter(price/1000000) + " mwei";
-
-		if(price.length < 13)
-			return numberFilter(price/1000000000) + " gwei";
-
-		if(price.length < 16)
-			return numberFilter(price/1000000000000) + " szabo";
-
-		if(price.length < 19)
-			return numberFilter(price.substr(0, price.length - 15)) + " finney";
-
-		return numberFilter(price.substr(0, price.length - 18)) + " ether";
-	}
-}])
-.filter('gasFilter', function() {
-	return function(gas) {
-		return (typeof gas !== 'undefined' ? parseInt(gas) : '?');
-	}
-})
 .filter('hashFilter', function() {
 	return function(hash) {
 		if(typeof hash === 'undefined')
@@ -294,14 +256,11 @@ angular.module('netStatsApp.filters', [])
 	}
 })
 .filter('latencyClass', function() {
-	return function(stats) {
-		if(stats.active === false)
-			return 'text-danger';
-
-		if(stats.latency <= 100)
+	return function(send, receive) {
+		if(receive - send <= 5)
 			return 'text-success';
 
-		if(stats.latency <= 1000)
+		if(receive - send <= 60)
 			return 'text-warning';
 
 		return 'text-danger'
@@ -437,6 +396,18 @@ angular.module('netStatsApp.filters', [])
 .filter('avgTimeClass', function() {
 	return function(time) {
 		return blockTimeClass(time);
+	}
+})
+.filter('votersClass', function() {
+	return function(voters) {
+
+		if(voters == 5)
+			return 'text-info';
+
+		if(voters == 4)
+			return 'text-warning';
+
+		return 'text-danger';
 	}
 })
 .filter('upTimeFilter', function() {
@@ -641,6 +612,14 @@ function mainClass(node, bestBlock)
 	return peerClass(node.peers, node.active);
 }
 
+function blockHeight(height, bestBlock)
+{
+	if( height >= bestBlock )
+		return 'text-success';
+
+	return 'text-danger';
+}
+
 function peerClass(peers, active)
 {
 	if( ! active)
@@ -658,13 +637,13 @@ function timeClass(timestamp)
 
 function blockTimeClass(diff)
 {
-	if(diff <= 13)
+	if(diff <= 60)
 		return 'text-success';
 
-	if(diff <= 20)
+	if(diff <= 180)
 		return 'text-warning';
 
-	if(diff <= 30)
+	if(diff <= 300)
 		return 'text-orange';
 
 	return 'text-danger'

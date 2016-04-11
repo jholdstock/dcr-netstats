@@ -1,12 +1,27 @@
 {
   "name": "eth-netstats",
-  "description": "Ethereum Network Intelligence dashboard",
+  "description": "Decred Network Intelligence dashboard",
   "version": "0.0.9",
   "private": true,
   "engines": {
     "node": "0.12.0",
     "npm": "2.5.1"
   },
+  "apps": [
+  {
+    "name": "Decred Dashboard",
+    "script": "./bin/www",
+    "node_args": [
+      "--harmony"
+    ],
+    "args": [
+      "decred_dashboard"
+    ],
+    "env": {
+      "COMMON_ENV_VAR": "true",
+      "NODE_ENV": "production"
+    }
+  }],
   "scripts": {
     "start": "node ./bin/www"
   },
@@ -19,27 +34,12 @@
     "geoip-lite": "1.1.6",
     "jade": "1.11.0",
     "lodash": "3.10.1",
+    "pm2": "^1.1.1",
     "primus": "3.2.1",
     "primus-emit": "0.1.2",
     "primus-spark-latency": "0.1.1",
     "ws": "0.8.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/cubedro/eth-netstats.git"
-  },
-  "homepage": "https://github.com/cubedro/eth-netstats",
-  "bugs": {
-    "url": "https://github.com/cubedro/eth-netstats/issues"
-  },
-  "authors": [
-    {
-      "name": "Marian Oancea",
-      "email": "marian@ethdev.com",
-      "url": "https://github.com/cubedro"
-    }
-  ],
-  "license": "LGPL-3.0",
   "devDependencies": {
     "grunt": "^0.4.5",
     "grunt-contrib-clean": "^0.6.0",

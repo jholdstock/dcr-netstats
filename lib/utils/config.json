@@ -1,0 +1,16 @@
+{
+	"development": {
+		"user" : "user",
+		"pass" : "pass",
+		"cert_path" : "/path-to-cert",
+		"host" : "127.0.0.1",
+		"port" : "19109"
+	},
+	"production": {
+		"user" : "user",
+		"pass" : "pass",
+		"cert_path" : "/path-to-cert",
+		"host" : "127.0.0.1",
+		"port" : "9109"
+	}
+}

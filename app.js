@@ -37,7 +37,7 @@ var Collection = require('./lib/collection');
 var Nodes = new Collection();
 Nodes.add( {id : 'localhost'}, function (err, info)
 {
-	if (err) console.error(err);
+	if (err) console.log(err);
 });
 
 Nodes.setChartsCallback(function (err, charts)
@@ -70,25 +70,25 @@ ws.on('open', function() {
     // Send a JSON-RPC command to be notified when blocks are connected and
     // disconnected from the chain.
     ws.send('{"jsonrpc":"1.0","id":"0","method":"notifyblocks","params":[]}');
-    
-    /* Seed local storage with initial data on restart */
-    getPeerInfo();
-    updateSupply();
-    updateLocked();
 
     /* Update peer list each minute */
-    var activeNodesInterval = setInterval(getPeerInfo, 60000);
+    var activeNodesInterval = setInterval(function() {
+      ws.send('{"jsonrpc":"1.0","id":"0","method":"getpeerinfo","params":[]}');
+    }, 60000);
 
     /* Update locked DCR in PoS each 5 minutes */
-    var lockedCoinsInterval = setInterval(updateLocked, 5 * 60000);
+    var lockedCoinsInterval = setInterval(function() {
+      ws.send('{"jsonrpc":"1.0","id":"0","method":"getticketpoolvalue","params":[]}');
+    }, 5 * 60000);
 
     var hashrateCheck = setInterval( function () {
-			ws.send('{"jsonrpc":"1.0","id":"0","method":"getmininginfo","params":[]}');
-		}, 60000);
+  		ws.send('{"jsonrpc":"1.0","id":"0","method":"getmininginfo","params":[]}');
+  	}, 60000);
 
 });
 
 ws.on('message', function(data, flags) {
+
     try {
     	data = JSON.parse(data);
     } catch(e) {
@@ -96,50 +96,30 @@ ws.on('message', function(data, flags) {
     	return;
     }
 
+    /* Get New Block by hash */
     if (data.params) { 
     	ws.send('{"jsonrpc":"1.0","id":"0","method":"getblock","params":["'+data.params[0]+'"]}'); 
     	return; 
     }
     
-		 block = data.result;
-		 if (block && block.height) {
+	  var result = data.result;
 
-        updateSupply();
+	  if (result && result.height) {
 
-			  Nodes.addBlock('localhost', block, function (err, stats)
-				{
-					if(err !== null)
-					{
-						console.error('API', 'BLK', 'Block error:', err);
-					}
-					else
-					{
-						if(stats !== null)
-						{
-							client.write({
-								action: 'block',
-								data: stats
-							});
+      addNewBlock(result);
 
-							console.success('API', 'BLK', 'Block:', block['height']);
+		} else if (result && result.networkhashps && result.pooledtx) {
+      updateNetworkHashrate(result);
 
-							Nodes.getCharts();
-						}
-					}
-				});
-			} else if (block && block.networkhashps && block.pooledtx) {
-				Nodes.updateMiningInfo(block, function (err, stats) {
-					if(err !== null)
-					{
-						console.error('API', 'BLK', 'MiningInfo error:', err);
-					} else {
-						client.write({
-							action: 'mininginfo',
-							data: stats
-						});
-					}
-				});
-			}
+		} else if (typeof result === "object") {
+      updatePeerInfo(result);
+    
+    } else if ( Number(result) === result && result % 1 === 0 ) {
+      updateSupply(result);
+
+    } else if ( Number(result) === result && result % 1 !== 0 ) {
+      updateLocked(result);
+    }
 });
 ws.on('error', function(derp) {
   console.log('ERROR:' + derp);
@@ -189,73 +169,80 @@ var nodeCleanupTimeout = setInterval( function ()
 
 }, 1000*60*60);
 
-function updateSupply () {
-
-  exec('dcrctl getcoinsupply', function(error, stdout, stderr) {
-    if (error || stderr) {
-      console.error(error, stderr); return next(error, null);
-    }
-    try {
-      var data = JSON.parse(stdout);
-    } catch(e) {
-      console.log('dcrctl getcoinsupply error');
-      return;
-    }
-      Nodes.updateSupply(data, function (err, stats) {
-        if(err !== null)
-        {
-          console.error('API', 'UPD', 'updateSupply error:', err);
-        } else {
-          console.success('API', 'UPD', 'Updated availiable supply');
-          return;
-        }
-      });
-  });
-}
-
-function updateLocked () {
-  exec('dcrctl getticketpoolvalue', function(error, stdout, stderr) {
-    if (error || stderr) {
-      console.error(error, stderr); return next(error, null);
-    }
-    try {
-      var data = JSON.parse(stdout);
-    } catch(e) {
-      console.log('dcrctl getticketpoolvalue error');
-      return;
-    }
-      Nodes.updateLocked(data, function (err, stats) {
-        if(err !== null)
-        {
-          console.error('API', 'UPD', 'updateLocked error:', err);
-        } else {
-          console.success('API', 'UPD', 'Updated locked coins');
-          return;
-        }
-      });
-  });
-}
-
-function getPeerInfo() {
-  
-  exec('dcrctl getpeerinfo', function(error, stdout, stderr) {
-    if (error || stderr) {
-      console.error(error, stderr); return next(error, null);
-    }
-    try {
-      var data = JSON.parse(stdout);
-    } catch(e) {
-      console.log('dcrctl getpeerinfo error');
-      return;
-    }
-    Nodes.updatePeers(data, function(err, peers) {
-      if (err) { 
-        console.log(err);
-      } else {
-        console.success('API', 'UPD', 'Updated peers');
+function addNewBlock (block) {
+    Nodes.addBlock('localhost', block, function (err, stats)
+    {
+      if(err !== null)
+      {
+        console.error('API', 'BLK', 'Block error:', err);
       }
-      client.write({ action: 'peers', data: {peers : Nodes.peers()} });
+      else
+      {
+        if(stats !== null)
+        {
+          client.write({
+            action: 'block',
+            data: stats
+          });
+
+          console.success('API', 'BLK', 'Block:', block['height']);
+
+          Nodes.getCharts();
+        }
+      }
     });
+
+    /* Update coin supply */
+    ws.send('{"jsonrpc":"1.0","id":"0","method":"getcoinsupply","params":[]}');
+}
+
+function updateSupply (data) {
+  Nodes.updateSupply(data, function (err, stats) {
+    if(err !== null)
+    {
+      console.error('API', 'UPD', 'updateSupply error:', err);
+    } else {
+      console.success('API', 'UPD', 'Updated availiable supply');
+      return;
+    }
+  });
+}
+
+function updateLocked (data) {
+  Nodes.updateLocked(data, function (err, stats) {
+    if(err !== null)
+    {
+      console.error('API', 'UPD', 'updateLocked error:', err);
+    } else {
+      console.success('API', 'UPD', 'Updated locked coins');
+      return;
+    }
+  });
+}
+
+function updatePeerInfo(data) {
+  Nodes.updatePeers(data, function(err, peers) {
+    if (err) { 
+      console.log(err);
+    } else {
+      console.success('API', 'UPD', 'Updated peers');
+    }
+    client.write({ action: 'peers', data: {peers : Nodes.peers()} });
+  });
+}
+
+function updateNetworkHashrate (data) {
+  Nodes.updateMiningInfo(data, function (err, stats) {
+    if(err !== null)
+    {
+      console.error('API', 'BLK', 'MiningInfo error:', err);
+    } else {
+      console.success('API', 'UPD', 'Updated mininginfo');
+      client.write({
+        action: 'mininginfo',
+        data: stats
+      });
+    }
   });
 }
 

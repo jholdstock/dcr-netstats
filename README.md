@@ -1,10 +1,7 @@
-Ethereum Network Stats
+Decred Network Stats
 ============
-[![Build Status][travis-image]][travis-url] [![dependency status][dep-image]][dep-url]
 
 This is a visual interface for tracking Decred network status. It uses WebSockets to receive stats from running Decred daemon and output them through an angular interface.
-
-![Screenshot](https://raw.githubusercontent.com/cubedro/eth-netstats/master/src/images/screenshot.jpg?v=0.0.6 "Screenshot")
 
 ## Prerequisite
 * node

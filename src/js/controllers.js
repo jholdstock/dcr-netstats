@@ -77,26 +77,6 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 		$localStorage.reverse = $scope.reverse;
 	}
 
-	// $scope.pinNode = function(id)
-	// {
-	// 	index = findIndex({id: id});
-
-	// 	if( !_.isUndefined($scope.nodes[index]) )
-	// 	{
-	// 		$scope.nodes[index].pinned = !$scope.nodes[index].pinned;
-
-	// 		if($scope.nodes[index].pinned)
-	// 		{
-	// 			$scope.pinned.push(id);
-	// 		}
-	// 		else
-	// 		{
-	// 			$scope.pinned.splice($scope.pinned.indexOf(id), 1);
-	// 		}
-	// 	}
-
-	// 	$localStorage.pinned = $scope.pinned;
-	// }
 
 	var timeout = setInterval(function ()
 	{
@@ -142,8 +122,8 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 		// filter data
 		data = xssFilter(data);
 
-		console.log('Action: ', action);
-		console.log('Data: ', data);
+		// console.log('Action: ', action);
+		// console.log('Data: ', data);
 
 		switch(action)
 		{
@@ -152,24 +132,9 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 
 				_.forEach($scope.nodes, function (node, index) {
 
-					// Init hashrate
-					// if( _.isUndefined(node.stats.hashrate) )
-					// 	node.stats.hashrate = 0;
-
-					// // Init latency
 					latencyFilter(node);
 
-					// // Init history
-					// if( _.isUndefined(data.history) )
-					// {
-					// 	data.history = new Array(40);
-					// 	_.fill(data.history, -1);
-					// }
-
 					$scope.blockReward = getBlockReward(Math.ceil(node.stats.block.height / 6144) - 1, BLOCK_REWARD);
-
-					// Init or recover pin
-					// node.pinned = ($scope.pinned.indexOf(node.id) >= 0 ? true : false);
 				});
 
 				if( $scope.nodes.length > 0 )
@@ -319,6 +284,7 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 
 				$scope.supply = Math.round(data.supply / 100000000).toString().replace(/(\d)(?=(\d\d\d)+([^\d]|$))/g, '$1 ');
 				$scope.locked = Math.round(data.locked).toString().replace(/(\d)(?=(\d\d\d)+([^\d]|$))/g, '$1 ');
+				$scope.pooledtx = data.pooledtx;
 
 				if( !_.isEqual($scope.transactionDensity, data.transactions) && data.transactions.length >= MAX_BINS )
 					$scope.transactionDensity = data.transactions;

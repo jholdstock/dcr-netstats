@@ -278,7 +278,13 @@ angular.module('netStatsApp.filters', [])
 		if(diff < 60)
 			return Math.round(diff) + ' s ago';
 
-		return moment.duration(Math.round(diff), 's').humanize() + ' ago';
+		var minutes = Math.floor(Math.floor(diff) / 60);
+		minutes = minutes < 10 ? '0' + minutes : minutes;
+
+		var seconds = (Math.round(diff) % 60);
+		seconds = seconds < 10 ? '0' + seconds : seconds;
+
+		return minutes + ':' + seconds + ' ago';
 	};
 })
 .filter('networkHashrateFilter', ['$sce', '$filter', function($sce, filter) {
@@ -390,7 +396,14 @@ angular.module('netStatsApp.filters', [])
 		if(time < 60)
 			return parseFloat(time).toFixed(2) + ' s';
 
-		return moment.duration(Math.round(time), 's').humanize();
+		var minutes = Math.floor(Math.floor(time) / 60);
+		minutes = minutes < 10 ? '0' + minutes : minutes;
+
+		var seconds = (Math.round(time) % 60);
+		seconds = seconds < 10 ? '0' + seconds : seconds;
+
+		return minutes + ':' + seconds + ' min';
+		//return moment.duration(Math.round(time), 's').humanize();
 	};
 })
 .filter('avgTimeClass', function() {

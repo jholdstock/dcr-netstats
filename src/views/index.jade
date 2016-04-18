@@ -119,7 +119,7 @@ block content
                     i.decred-font-logo(style="margin: 0;") A
                   div.big-details-holder
                     span.small-title block reward
-                    span.big-details(style="font-size: 40px; line-height: 45px;letter-spacing: -3px;") {{blockReward.toString().substr(0,5)}} 
+                    span.big-details(style="font-size: 40px; line-height: 45px;letter-spacing: -3px;white-space: nowrap;") {{blockReward.toString().substr(0,5)}} 
                       span.smaller-text &nbsp;DCR
 
               div.col-xs-3.stat-holder
@@ -128,7 +128,7 @@ block content
                     i.icon-clock
                   div.big-details-holder
                     span.small-title reward adjustment in
-                    span.big-details(style="font-size: 40px; line-height: 45px;letter-spacing: -3px;") {{6144 - bestStats.block.height % 6144}} 
+                    span.big-details(style="font-size: 40px; line-height: 45px;letter-spacing: -3px;white-space: nowrap;") {{6144 - bestStats.block.height % 6144}} 
                       span.smaller-text &nbsp;blocks
 
               div.col-xs-3.stat-holder
@@ -137,7 +137,7 @@ block content
                     i.icon-network
                   div.big-details-holder
                     span.small-title available supply
-                    span.big-details(style="font-size: 40px; line-height: 45px;letter-spacing: -3px;") {{ supply }}
+                    span.big-details(style="font-size: 38px; line-height: 45px;letter-spacing: -3px;white-space: nowrap;") {{ supply }}
                       span.smaller-text &nbsp;DCR
 
               div.col-xs-3.stat-holder
@@ -146,7 +146,7 @@ block content
                     i.icon-mining
                   div.big-details-holder
                     span.small-title locked dcr
-                    span.big-details(style="font-size: 40px; line-height: 45px;letter-spacing: -3px;") {{ locked }}
+                    span.big-details(style="font-size: 38px; line-height: 45px;letter-spacing: -3px;white-space: nowrap;") {{ locked }}
                       span.smaller-text &nbsp;DCR
 
 

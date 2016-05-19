@@ -55,78 +55,120 @@ Nodes.setChartsCallback(function (err, charts)
 	}
 });
 
+// reconnect interval = 5 seconds
+var reconnectInterval = 5 * 1000;
+var reconnecting = false;
+var ws;
 // Initiate the websocket connection.  The dcrd generated certificate acts as
 // its own certificate authority, so it needs to be specified in the 'ca' array
 // for the certificate to properly validate.
-var ws = new WebSocket('wss://'+config.host+':'+config.port+'/ws', {
-  headers: {
-    'Authorization': 'Basic '+new Buffer(rpc_user+':'+rpc_password).toString('base64')
-  },
-  cert: rpc_cert,
-  ca: [rpc_cert]
-});
-ws.on('open', function() {
-    console.log('CONNECTED');
-    // Send a JSON-RPC command to be notified when blocks are connected and
-    // disconnected from the chain.
-    ws.send('{"jsonrpc":"1.0","id":"0","method":"notifyblocks","params":[]}');
+var connect = function() {
+	reconnecting = false;
+	console.log('Connecting to Decred daemon');
+	ws = new WebSocket('wss://'+config.host+':'+config.port+'/ws', {
+	  headers: {
+	    'Authorization': 'Basic '+new Buffer(rpc_user+':'+rpc_password).toString('base64')
+	  },
+	  cert: rpc_cert,
+	  ca: [rpc_cert]
+	});
 
-    /* Update peer list each minute */
-    var activeNodesInterval = setInterval(function() {
-      ws.send('{"jsonrpc":"1.0","id":"0","method":"getpeerinfo","params":[]}');
-    }, 60000);
+	ws.on('open', function() {
+	    console.log('CONNECTED');
+	    // Send a JSON-RPC command to be notified when blocks are connected and
+	    // disconnected from the chain.
+	    ws.send('{"jsonrpc":"1.0","id":"0","method":"notifyblocks","params":[]}', function(err) {
+				if (err) {
+					console.log('Socket error: ' + err);
+				}
+			});
 
-    /* Update locked DCR in PoS each 5 minutes */
-    var lockedCoinsInterval = setInterval(function() {
-      ws.send('{"jsonrpc":"1.0","id":"0","method":"getticketpoolvalue","params":[]}');
-    }, 5 * 60000);
+	    /* Update peer list each minute */
+	    var activeNodesInterval = setInterval(function() {
+	      ws.send('{"jsonrpc":"1.0","id":"0","method":"getpeerinfo","params":[]}', function(err) {
+					if (err) {
+						console.log('Socket error: ' + err);
+					}
+				});
+	    }, 60000);
 
-    var hashrateCheck = setInterval( function () {
-  		ws.send('{"jsonrpc":"1.0","id":"0","method":"getmininginfo","params":[]}');
-  	}, 60000);
+	    /* Update locked DCR in PoS each 5 minutes */
+	    var lockedCoinsInterval = setInterval(function() {
+	      ws.send('{"jsonrpc":"1.0","id":"0","method":"getticketpoolvalue","params":[]}', function(err) {
+					if (err) {
+						console.log('Socket error: ' + err);
+					}
+				});
+	    }, 5 * 60000);
 
-});
+	    var hashrateCheck = setInterval( function () {
+	  		ws.send('{"jsonrpc":"1.0","id":"0","method":"getmininginfo","params":[]}', function(err) {
+					if (err) {
+						console.log('Socket error: ' + err);
+					}
+				});
+	  	}, 60000);
 
-ws.on('message', function(data, flags) {
+	});
 
-    try {
-    	data = JSON.parse(data);
-    } catch(e) {
-    	console.log(e);
-    	return;
-    }
+	ws.on('message', function(data, flags) {
 
-    /* Get New Block by hash */
-    if (data.params) { 
-    	ws.send('{"jsonrpc":"1.0","id":"0","method":"getblock","params":["'+data.params[0]+'"]}'); 
-    	return; 
-    }
-    
-	  var result = data.result;
+	    try {
+	    	data = JSON.parse(data);
+	    } catch(e) {
+	    	console.log(e);
+	    	return;
+	    }
 
-	  if (result && result.height) {
+	    /* Get New Block by hash */
+	    if (data.params) {
+	    	ws.send('{"jsonrpc":"1.0","id":"0","method":"getblock","params":["'+data.params[0]+'"]}', function(err) {
+					if (err) {
+						console.log('Socket error: ' + err);
+					}
+				});
+	    	return;
+	    }
 
-      addNewBlock(result);
+		  var result = data.result;
 
-		} else if (result && result.networkhashps && result.pooledtx) {
-      updateNetworkHashrate(result);
+		  if (result && result.height) {
 
-		} else if (typeof result === "object") {
-      updatePeerInfo(result);
-    
-    } else if ( Number(result) === result && result % 1 === 0 ) {
-      updateSupply(result);
+	      addNewBlock(result);
 
-    } else if ( Number(result) === result && result % 1 !== 0 ) {
-      updateLocked(result);
-    }
-});
-ws.on('error', function(derp) {
-  console.log('ERROR:' + derp);
-})
-ws.on('close', function(data) {
-  console.log('DISCONNECTED');
-})
+			} else if (result && result.networkhashps && result.pooledtx) {
+	      updateNetworkHashrate(result);
+
+			} else if (typeof result === "object") {
+	      updatePeerInfo(result);
+
+	    } else if ( Number(result) === result && result % 1 === 0 ) {
+	      updateSupply(result);
+
+	    } else if ( Number(result) === result && result % 1 !== 0 ) {
+	      updateLocked(result);
+	    }
+	});
+	ws.on('error', function(derp) {
+	  console.log('ERROR:' + derp);
+		if (!reconnecting) {
+			console.log('Trying to reconnect.');
+			reconnecting = true;
+			setTimeout(connect, reconnectInterval);
+		}
+	});
+	ws.on('close', function(data) {
+	  console.log('DISCONNECTED');
+		if (!reconnecting) {
+			console.log('Trying to reconnect.');
+			reconnecting = true;
+			setTimeout(connect, reconnectInterval);
+		}
+	});
+};
+
+/* Connect to decred daemon on start */
+connect();
 
 client.on('connection', function (clientSpark)
 {
@@ -193,7 +235,11 @@ function addNewBlock (block) {
     });
 
     /* Update coin supply */
-    ws.send('{"jsonrpc":"1.0","id":"0","method":"getcoinsupply","params":[]}');
+    ws.send('{"jsonrpc":"1.0","id":"0","method":"getcoinsupply","params":[]}', function(err) {
+			if (err) {
+				console.log('Socket error: ' + err);
+			}
+		});
 }
 
 function updateSupply (data) {
@@ -222,7 +268,7 @@ function updateLocked (data) {
 
 function updatePeerInfo(data) {
   Nodes.updatePeers(data, function(err, peers) {
-    if (err) { 
+    if (err) {
       console.log(err);
     } else {
       console.success('API', 'UPD', 'Updated peers');

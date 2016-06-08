@@ -77,7 +77,14 @@ var connect = function() {
 	    console.log('CONNECTED');
 	    // Send a JSON-RPC command to be notified when blocks are connected and
 	    // disconnected from the chain.
-	    ws.send('{"jsonrpc":"1.0","id":"0","method":"notifyblocks","params":[]}', function(err) {
+	    ws.send('{"jsonrpc":"1.0","id":"notifyblocks","method":"notifyblocks","params":[]}', function(err) {
+				if (err) {
+					console.log('Socket error: ' + err);
+				}
+			});
+		
+		// gets block info on restart, not only on new blocks
+		ws.send('{"jsonrpc":"1.0","id":"getbestblock","method":"getbestblock","params":[]}', function(err) {
 				if (err) {
 					console.log('Socket error: ' + err);
 				}
@@ -85,7 +92,7 @@ var connect = function() {
 
 	    /* Update peer list each minute */
 	    var activeNodesInterval = setInterval(function() {
-	      ws.send('{"jsonrpc":"1.0","id":"0","method":"getpeerinfo","params":[]}', function(err) {
+	      ws.send('{"jsonrpc":"1.0","id":"getpeerinfo","method":"getpeerinfo","params":[]}', function(err) {
 					if (err) {
 						console.log('Socket error: ' + err);
 					}
@@ -94,15 +101,31 @@ var connect = function() {
 
 	    /* Update locked DCR in PoS each 5 minutes */
 	    var lockedCoinsInterval = setInterval(function() {
-	      ws.send('{"jsonrpc":"1.0","id":"0","method":"getticketpoolvalue","params":[]}', function(err) {
+	      ws.send('{"jsonrpc":"1.0","id":"getticketpoolvalue","method":"getticketpoolvalue","params":[]}', function(err) {
 					if (err) {
 						console.log('Socket error: ' + err);
 					}
 				});
-	    }, 5 * 60000);
+	    }, 60000);
 
 	    var hashrateCheck = setInterval( function () {
-	  		ws.send('{"jsonrpc":"1.0","id":"0","method":"getmininginfo","params":[]}', function(err) {
+	  		ws.send('{"jsonrpc":"1.0","id":"getmininginfo","method":"getmininginfo","params":[]}', function(err) {
+					if (err) {
+						console.log('Socket error: ' + err);
+					}
+				});
+	  	}, 60000);
+
+	    var hashrateCheck = setInterval( function () {
+	  		ws.send('{"jsonrpc":"1.0","id":"getstakeinfo","method":"getstakeinfo","params":[]}', function(err) {
+					if (err) {
+						console.log('Socket error: ' + err);
+					}
+				});
+	  	}, 60000);
+
+	    var hashrateCheck = setInterval( function () {
+	  		ws.send('{"jsonrpc":"1.0","id":"estimatestakediff","method":"estimatestakediff","params":[]}', function(err) {
 					if (err) {
 						console.log('Socket error: ' + err);
 					}
@@ -114,6 +137,7 @@ var connect = function() {
 	ws.on('message', function(data, flags) {
 
 	    try {
+			console.log(data);
 	    	data = JSON.parse(data);
 	    } catch(e) {
 	    	console.log(e);
@@ -122,7 +146,7 @@ var connect = function() {
 
 	    /* Get New Block by hash */
 	    if (data.params) {
-	    	ws.send('{"jsonrpc":"1.0","id":"0","method":"getblock","params":["'+data.params[0]+'"]}', function(err) {
+	    	ws.send('{"jsonrpc":"1.0","id":"getblock","method":"getblock","params":["'+data.params[0]+'"]}', function(err) {
 					if (err) {
 						console.log('Socket error: ' + err);
 					}
@@ -130,22 +154,28 @@ var connect = function() {
 	    	return;
 	    }
 
-		  var result = data.result;
+		var result = data.result;
 
-		  if (result && result.height) {
-
+		if (result && data.id && data.id == 'getbestblock') {
+			// requests last block
+	    	ws.send('{"jsonrpc":"1.0","id":"getblock","method":"getblock","params":["'+result.hash+'"]}', function(err) {
+					if (err) {
+						console.log('Socket error: ' + err);
+					}
+				});
+		} else if (result && data.id && data.id == 'getblock') {
 	      addNewBlock(result);
-
-			} else if (result && result.networkhashps && result.pooledtx) {
+		} else if (result && data.id && data.id == 'getmininginfo') {
 	      updateNetworkHashrate(result);
-
-			} else if (typeof result === "object") {
+		} else if (result && data.id && data.id == 'getstakeinfo') {
+		    updateStake(result);
+		} else if (result && data.id && data.id == 'estimatestakediff') {
+	      updateEstimateStake(result);
+		} else if (result && data.id && data.id == 'getpeerinfo') {
 	      updatePeerInfo(result);
-
-	    } else if ( Number(result) === result && result % 1 === 0 ) {
+	    } else if ( result && data.id && data.id == 'getcoinsupply' ) {
 	      updateSupply(result);
-
-	    } else if ( Number(result) === result && result % 1 !== 0 ) {
+	    } else if (result && data.id && data.id == 'getticketpoolvalue' ) {
 	      updateLocked(result);
 	    }
 	});
@@ -235,7 +265,7 @@ function addNewBlock (block) {
     });
 
     /* Update coin supply */
-    ws.send('{"jsonrpc":"1.0","id":"0","method":"getcoinsupply","params":[]}', function(err) {
+    ws.send('{"jsonrpc":"1.0","id":"getcoinsupply","method":"getcoinsupply","params":[]}', function(err) {
 			if (err) {
 				console.log('Socket error: ' + err);
 			}
@@ -286,6 +316,36 @@ function updateNetworkHashrate (data) {
       console.success('API', 'UPD', 'Updated mininginfo');
       client.write({
         action: 'mininginfo',
+        data: stats
+      });
+    }
+  });
+}
+
+function updateStake (data) {
+  Nodes.updateStakeInfo(data, function (err, stats) {
+    if(err !== null)
+    {
+      console.error('API', 'BLK', 'StakeInfo error:', err);
+    } else {
+      console.success('API', 'UPD', 'Updated stake info');
+      client.write({
+        action: 'stakeinfo',
+        data: stats
+      });
+    }
+  });
+}
+
+function updateEstimateStake (data) {
+  Nodes.updateEstimateStake(data, function (err, stats) {
+    if(err !== null)
+    {
+      console.error('API', 'BLK', 'EstimateStake error:', err);
+    } else {
+      console.success('API', 'UPD', 'EstimateStake fee info');
+      client.write({
+        action: 'estimatestakediff',
         data: stats
       });
     }

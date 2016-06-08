@@ -7,19 +7,20 @@ block content
       div.col-xs-2.stat-holder
         div.big-info.bestblock.text-info
           div.pull-left.icon-full-width
-            i.icon-block
+            i.icon-gasprice
           div.big-details-holder
-            span.small-title best block
-            span.big-details {{'#'}}{{ bestBlock | number}}
+            span.small-title Ticket price
+              span.small 
+            span.big-details {{ (bestStats.block.sbits).toString().substr(0,5) }} DCR
           div.clearfix
       div.col-xs-2.stat-holder
         div.big-info.uncleCount(class="{{ bestStats.block.voters | votersClass }}")
           div.pull-left.icon-full-width
-            i.icon-group
+              i.icon-clock
           div.big-details-holder
-            span.small-title voters&nbsp;
+            span.small-title Price adjusts in 
               span.small 
-            span.big-details {{ bestStats.block.voters }}
+            span.big-details {{144 - bestStats.block.height % 144}} blocks
           div.clearfix
       div.col-xs-2.stat-holder
         div.big-info.blocktime(class="{{ lastBlock | timeClass : true }}")
@@ -38,23 +39,6 @@ block content
             span.small-title avg block time
             span.big-details {{ avgBlockTime | avgTimeFilter }}
           div.clearfix
-      div.col-xs-2.stat-holder
-        div.big-info.difficulty.text-orange
-          div.pull-left.icon-full-width
-            i.icon-hashrate
-          div.big-details-holder
-            span.small-title avg network hashrate
-            span.big-details(ng-bind-html="avgHashrate | networkHashrateFilter")
-          div.clearfix
-      div.col-xs-2.stat-holder
-        div.big-info.difficulty.text-danger
-          div.pull-left.icon-full-width
-            i.icon-difficulty
-          div.big-details-holder
-            span.small-title difficulty
-            span.big-details
-              span.small-hash {{ lastDifficulty | totalDifficultyFilter }}
-          div.clearfix
 
       div.clearfix
 
@@ -65,32 +49,58 @@ block content
           div.col-xs-2.stat-holder.box
             div.gasprice.text-info
               i.icon-gasprice
-              span.small-title Ticket price
-              span.small-value {{ (bestStats.block.sbits).toString().substr(0,5) }} DCR
-          div.col-xs-2.stat-holder.box
-            div.gasprice.text-info
-              i.icon-gasprice
               span.small-title Poolsize
               span.small-value {{ bestStats.block.poolsize }} tickets
           div.col-xs-2.stat-holder.box
-            div.active-nodes(class="text-success")
-              i.icon-clock
-              span.small-title Price adjusts in 
-              span.small-value {{144 - bestStats.block.height % 144}} blocks
+            div.gasprice.text-info
+              i.icon-block
+              span.small-title best block
+              span.small-value {{'#'}}{{ bestBlock | number}}
           div.col-xs-2.stat-holder.box
             div.active-nodes(class="text-success")
-              i.icon-uncle
-              span.small-title Mempool
-              span.small-value {{pooledtx}}
+              i.icon-difficulty
+              span.small-title difficulty
+              span.small-value {{ lastDifficulty | totalDifficultyFilter }}
           div.col-xs-2.stat-holder.box
             div.page-latency(class="{{ {active: true, latency: latency} | latencyClass }}")
               i.icon-clock
               span.small-title page latency
               span.small-value {{latency}} ms
 
+
+        div.row.second-row
+
+          div.col-xs-2.stat-holder.box
+            div.difficulty.text-info
+              i.icon-uncle
+              span.small-title Mempool
+              span.small-value {{pooledtx}}
+          div.col-xs-2.stat-holder.box
+            div.difficulty.text-info
+              i.icon-group
+              span.small-title voters&nbsp;
+              span.small-value {{ bestStats.block.voters }}
+          div.col-xs-2.stat-holder.box
+            div.active-nodes(class="text-success")
+              i.icon-hashrate
+              span.small-title avg hashrate
+              span.small-value(ng-bind-html="avgHashrate | networkHashrateFilter")
+          div.col-xs-2.stat-holder.box
+
+
         div.row
           div.col-xs-8
             div.row
+              div.col-xs-3.stat-holder
+                div.big-info.chart.text-info
+                  span.small-title freshstake
+                  sparkchart.big-details.spark-difficulty(data="{{freshstakeChart.join(',')}}")
+
+              div.col-xs-3.stat-holder
+                div.big-info.chart.text-info
+                  span.small-title voters
+                  sparkchart.big-details.spark-voters(data="{{votersChart.join(',')}}")
+
               div.col-xs-3.stat-holder
                 div.big-info.chart(class="{{ avgBlockTime | avgTimeClass }}")
                   //- i.icon-time
@@ -102,16 +112,6 @@ block content
                 div.big-info.chart.text-info
                   span.small-title transactions
                   sparkchart.big-details.spark-transactions(data="{{transactionDensity.join(',')}}")
-
-              div.col-xs-3.stat-holder
-                div.big-info.chart.text-info
-                  span.small-title voters
-                  sparkchart.big-details.spark-voters(data="{{votersChart.join(',')}}")
-
-              div.col-xs-3.stat-holder
-                div.big-info.chart.text-info
-                  span.small-title freshstake
-                  sparkchart.big-details.spark-difficulty(data="{{freshstakeChart.join(',')}}")
 
               div.col-xs-3.stat-holder
                 div.big-info.bottom-stats.text-success
@@ -149,13 +149,11 @@ block content
                     span.big-details(style="font-size: 38px; line-height: 45px;letter-spacing: -3px;white-space: nowrap;") {{ locked }}
                       span.smaller-text &nbsp;DCR
 
+          //div.clearfix
 
-
-          div.col-xs-4.stat-holder.map-holder
-            //- div.col-xs-12
-            nodemap#mapHolder(data="map")
 
     div.row(ng-cloak, style="padding-top: 10px")
+    div.col-xs-4.map-holder
       table.table.table-striped
         thead
           tr.text-info
@@ -180,3 +178,8 @@ block content
             td(class="{{ node.currentheight | blockHeight : bestBlock }}") # {{ node.currentheight }}
             td
               span.small {{ node.subver }}
+
+    div.col-xs-4.map-holder
+      //- div.col-xs-12
+      nodemap#mapHolder(data="map")
+

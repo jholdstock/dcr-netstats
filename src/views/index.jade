@@ -11,7 +11,8 @@ block content
           div.big-details-holder
             span.small-title Ticket price
               span.small 
-            span.big-details {{ (bestStats.block.sbits).toString().substr(0,5) }} DCR
+            span.big-details {{ (bestStats.block.sbits).toString().substr(0,5) }}
+              span.smaller-text &nbsp;DCR
           div.clearfix
       div.col-xs-2.stat-holder
         div.big-info.uncleCount(class="{{ bestStats.block.voters | votersClass }}")
@@ -20,73 +21,98 @@ block content
           div.big-details-holder
             span.small-title Price adjusts in 
               span.small 
-            span.big-details {{144 - bestStats.block.height % 144}} blocks
+            span.big-details {{144 - bestStats.block.height % 144}} 
+              span.smaller-text blocks
           div.clearfix
       div.col-xs-2.stat-holder
-        div.big-info.blocktime(class="{{ lastBlock | timeClass : true }}")
+        div.big-info.blocktime.text-info
           div.pull-left.icon-full-width
-            i.icon-time
+            i.icon-mining
           div.big-details-holder
-            span.small-title last block
-            span.big-details {{ lastBlock | blockTimeFilter }}
-            //- span.big-details(time-ago="lastBlock")
+            span.small-title block reward
+            span.big-details {{blockReward.toString().substr(0,5)}}
+              span.smaller-text &nbsp;DCR
           div.clearfix
       div.col-xs-2.stat-holder
-        div.big-info.avgblocktime(class="{{ avgBlockTime | avgTimeClass }}")
+        div.big-info.avgblocktime.text-info
           div.pull-left.icon-full-width
-            i.icon-gas
+            i.icon-gasprice
           div.big-details-holder
-            span.small-title avg block time
-            span.big-details {{ avgBlockTime | avgTimeFilter }}
+            span.small-title Ticket Pool Size
+            span.big-details {{ printablePoolSize }} 
+              span.smaller-text tickets
           div.clearfix
-
-      div.clearfix
 
 
     div.row(ng-cloak)
       div.col-xs-12.stats-boxes(style="padding-top: 0px;")
+
+        // small columns
         div.row.second-row
           div.col-xs-2.stat-holder.box
             div.gasprice.text-info
               i.icon-gasprice
-              span.small-title Poolsize
-              span.small-value {{ bestStats.block.poolsize }} tickets
+              span.small-title next price
+              span.small-value {{ estimateexpected.toString().substr(0,5) }}&nbsp;DCR
+          div.col-xs-2.stat-holder.box
+            div.blocktime(class="{{ lastBlock | timeClass : true }}")
+              i.icon-time
+              span.small-title last block
+              span.small-value {{ lastBlock | blockTimeFilter }}
+          div.col-xs-2.stat-holder.box
+            div.active-nodes.text-info
+              i.icon-mining
+              span.small-title stake reward
+              span.small-value {{ stakeReward.toString().substr(0,5) }}&nbsp;DCR
+          div.col-xs-2.stat-holder.box
+            div.page-latency.text-info
+              i.icon-uncle
+              span.small-title Ticket Mempool
+              span.small-value {{ allmempooltix }} tickets
+
+        div.row.second-row
+          div.col-xs-2.stat-holder.box
+            div.gasprice.text-success
+              i.icon-gasprice
+              span.small-title min price
+              span.small-value {{ estimatemin.toString().substr(0,5) }}&nbsp;DCR
+          div.col-xs-2.stat-holder.box
+            div.avgblocktime(class="{{ avgBlockTime | avgTimeClass }}")
+              i.icon-clock
+              span.small-title avg block time
+              span.small-value {{ avgBlockTime | avgTimeFilter }}
+          div.col-xs-2.stat-holder.box
+            div.active-nodes.text-success
+              i.icon-clock
+              span.small-title adjusts in
+              span.small-value {{6144 - bestStats.block.height % 6144}}&nbsp;blocks
+          div.col-xs-2.stat-holder.box
+            div.difficulty.text-success
+              i.icon-gas
+              span.small-title locked dcr
+              span.small-value {{ locked }}&nbsp;DCR
+
+        div.row.second-row
+          div.col-xs-2.stat-holder.box
+            div.gasprice.text-warning
+              i.icon-gasprice
+              span.small-title max price
+              span.small-value {{ estimatemax.toString().substr(0,5) }}&nbsp;DCR
           div.col-xs-2.stat-holder.box
             div.gasprice.text-info
               i.icon-block
               span.small-title best block
               span.small-value {{'#'}}{{ bestBlock | number}}
           div.col-xs-2.stat-holder.box
-            div.active-nodes(class="text-success")
-              i.icon-difficulty
-              span.small-title difficulty
-              span.small-value {{ lastDifficulty | totalDifficultyFilter }}
+            div.active-nodes.text-warning
+              i.decred-font-logo A
+              span.small-title available supply
+              span.small-value {{ supply }}&nbsp;DCR
           div.col-xs-2.stat-holder.box
-            div.page-latency(class="{{ {active: true, latency: latency} | latencyClass }}")
-              i.icon-clock
-              span.small-title page latency
-              span.small-value {{latency}} ms
-
-
-        div.row.second-row
-
-          div.col-xs-2.stat-holder.box
-            div.difficulty.text-info
-              i.icon-uncle
-              span.small-title Mempool
-              span.small-value {{pooledtx}}
-          div.col-xs-2.stat-holder.box
-            div.difficulty.text-info
-              i.icon-group
-              span.small-title voters&nbsp;
-              span.small-value {{ bestStats.block.voters }}
-          div.col-xs-2.stat-holder.box
-            div.active-nodes(class="text-success")
-              i.icon-hashrate
-              span.small-title avg hashrate
-              span.small-value(ng-bind-html="avgHashrate | networkHashrateFilter")
-          div.col-xs-2.stat-holder.box
-
+            div.gasprice.text-warning
+              i.icon-gasprice
+              span.small-title Avg Ticket Price
+              span.small-value {{ avgTicketPrice.toString().substr(0,5) }}&nbsp;DCR
 
         div.row
           div.col-xs-8
@@ -112,45 +138,28 @@ block content
                 div.big-info.chart.text-info
                   span.small-title transactions
                   sparkchart.big-details.spark-transactions(data="{{transactionDensity.join(',')}}")
-
-              div.col-xs-3.stat-holder
-                div.big-info.bottom-stats.text-success
-                  div.pull-left.icon-full-width
-                    i.decred-font-logo(style="margin: 0;") A
-                  div.big-details-holder
-                    span.small-title block reward
-                    span.big-details(style="font-size: 40px; line-height: 45px;letter-spacing: -3px;white-space: nowrap;") {{blockReward.toString().substr(0,5)}} 
-                      span.smaller-text &nbsp;DCR
-
-              div.col-xs-3.stat-holder
-                div.big-info.bottom-stats.text-success
-                  div.pull-left.icon-full-width
-                    i.icon-clock
-                  div.big-details-holder
-                    span.small-title reward adjustment in
-                    span.big-details(style="font-size: 40px; line-height: 45px;letter-spacing: -3px;white-space: nowrap;") {{6144 - bestStats.block.height % 6144}} 
-                      span.smaller-text &nbsp;blocks
-
-              div.col-xs-3.stat-holder
-                div.big-info.bottom-stats.text-success
-                  div.pull-left.icon-full-width
-                    i.icon-network
-                  div.big-details-holder
-                    span.small-title available supply
-                    span.big-details(style="font-size: 38px; line-height: 45px;letter-spacing: -3px;white-space: nowrap;") {{ supply }}
-                      span.smaller-text &nbsp;DCR
-
-              div.col-xs-3.stat-holder
-                div.big-info.bottom-stats.text-success
-                  div.pull-left.icon-full-width
-                    i.icon-mining
-                  div.big-details-holder
-                    span.small-title locked dcr
-                    span.big-details(style="font-size: 38px; line-height: 45px;letter-spacing: -3px;white-space: nowrap;") {{ locked }}
-                      span.smaller-text &nbsp;DCR
-
-          //div.clearfix
-
+ 
+        div.row.second-row
+          div.col-xs-2.stat-holder.box
+            div.active-nodes.text-success
+              i.icon-difficulty
+              span.small-title PoW difficulty
+              span.small-value {{ lastDifficulty | totalDifficultyFilter }}
+          div.col-xs-2.stat-holder.box
+            div.active-nodes.text-success
+              i.icon-hashrate
+              span.small-title avg hashrate
+              span.small-value(ng-bind-html="avgHashrate | networkHashrateFilter")
+          div.col-xs-2.stat-holder.box
+            div.active-nodes.text-success
+              i.icon-mining
+              span.small-title PoW reward
+              span.small-value {{ (blockReward * 0.6).toString().substr(0,5) }}&nbsp;DCR
+          div.col-xs-2.stat-holder.box
+            div.page-latency(class="{{ {active: true, latency: latency} | latencyClass }}")
+              i.icon-clock
+              span.small-title page latency
+              span.small-value {{latency}} ms
 
     div.row(ng-cloak, style="padding-top: 10px")
     div.col-xs-4.map-holder

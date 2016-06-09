@@ -23,7 +23,13 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 	$scope.supply = 0;
 	$scope.locked = 0;
 	$scope.blockReward = BLOCK_REWARD;
+	$scope.stakeReward = BLOCK_REWARD * 0.06;
 	$scope.bestStats = {};
+	$scope.poolsize = 0;
+	$scope.allmempooltix = 0;
+	$scope.estimatemin = 0;
+	$scope.estimatemax = 0;
+	$scope.estimateexpected = 0;
 
 	//$scope.lastGasLimit = _.fill(Array(MAX_BINS), 2);
 	$scope.lastBlocksTime = _.fill(Array(MAX_BINS), 2);
@@ -135,6 +141,7 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 					latencyFilter(node);
 
 					$scope.blockReward = getBlockReward(Math.ceil(node.stats.block.height / 6144) - 1, BLOCK_REWARD);
+					$scope.stakeReward = ($scope.blockReward) * 0.06;
 				});
 
 				if( $scope.nodes.length > 0 )
@@ -194,6 +201,8 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 					$scope.nodes[index].stats.block = data.block;
 					$scope.nodes[index].stats.propagationAvg = data.propagationAvg;
 					$scope.blockReward = getBlockReward(Math.ceil(data.block.height / 6144) - 1, BLOCK_REWARD);
+					$scope.stakeReward = ($scope.blockReward) * 0.06;
+					$scope.poolsize = data.poolsize;
 
 					updateBestBlock();
 				}
@@ -260,9 +269,22 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 				break;
 
 			case "mininginfo":
+				console.log(data.networkhashps);
 				$scope.avgHashrate = data.networkhashps;
 				$scope.pooledtx = data.pooledtx;
 
+				break;
+				
+			case "tiketsmempool":
+				$scope.allmempooltix = data.allmempooltix;
+
+				break;
+
+			case "estimatestakediff":
+				$scope.estimatemin = data.min;
+				$scope.estimatemax = data.max;
+				$scope.estimateexpected = data.expected;
+				
 				break;
 
 			case "charts":
@@ -272,6 +294,9 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 
 				if( !_.isEqual($scope.avgHashrate, data.avgHashrate) )
 					$scope.avgHashrate = data.avgHashrate;
+				console.log(data.avgHashrate);
+				console.log(data.networkhashps);
+
 
 				if( !_.isEqual($scope.lastBlocksTime, data.blocktime) && data.blocktime.length >= MAX_BINS ) 
 					$scope.lastBlocksTime = data.blocktime;
@@ -295,6 +320,18 @@ netStatsApp.controller('StatsCtrl', function($scope, $filter, $localStorage, soc
 				}).stats.block.height;
 
 				$scope.blockReward = getBlockReward(Math.ceil(bestHeight / 6144) - 1, BLOCK_REWARD);
+				$scope.stakeReward = ($scope.blockReward) * 0.06;
+				
+				// stake info
+				$scope.poolsize = data.poolsize;
+				var lastPoolsize = data.poolsize.slice(-1)[0];
+				$scope.printablePoolSize = Math.round(lastPoolsize).toString().replace(/(\d)(?=(\d\d\d)+([^\d]|$))/g, '$1 ');
+				$scope.allmempooltix = data.allmempooltix;
+				$scope.estimatemin = data.estimatemin;
+				$scope.estimatemax = data.estimatemax;
+				$scope.estimateexpected = data.estimateexpected;
+				$scope.avgTicketPrice = data.locked / lastPoolsize;
+				
 
 				break;
 

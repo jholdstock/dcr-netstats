@@ -90,41 +90,34 @@ var connect = function() {
 				}
 			});
 
-	    /* Update peer list each minute */
+	    /* Update stuff each minute */
 	    var activeNodesInterval = setInterval(function() {
-	      ws.send('{"jsonrpc":"1.0","id":"getpeerinfo","method":"getpeerinfo","params":[]}', function(err) {
+	    	ws.send('{"jsonrpc":"1.0","id":"getpeerinfo","method":"getpeerinfo","params":[]}', function(err) {
 					if (err) {
 						console.log('Socket error: ' + err);
 					}
 				});
-	    }, 60000);
-
-	    /* Update locked DCR in PoS each 5 minutes */
-	    var lockedCoinsInterval = setInterval(function() {
-	      ws.send('{"jsonrpc":"1.0","id":"getticketpoolvalue","method":"getticketpoolvalue","params":[]}', function(err) {
+			ws.send('{"jsonrpc":"1.0","id":"getticketpoolvalue","method":"getticketpoolvalue","params":[]}', function(err) {
 					if (err) {
 						console.log('Socket error: ' + err);
 					}
 				});
-	    }, 60000);
-
-	    var hashrateCheck = setInterval( function () {
+	  		ws.send('{"jsonrpc":"1.0","id":"ticketsmempool","method":"getrawmempool","params":[false, "tickets"]}', function(err) {
+					if (err) {
+						console.log('Socket error: ' + err);
+					}
+				});
+				//dcrctl getrawmempool false tickets
+//	  		ws.send('{"jsonrpc":"1.0","id":"getstakeinfo","method":"getstakeinfo","params":[]}', function(err) {
+//					if (err) {
+//						console.log('Socket error: ' + err);
+//					}
+//				});
 	  		ws.send('{"jsonrpc":"1.0","id":"getmininginfo","method":"getmininginfo","params":[]}', function(err) {
 					if (err) {
 						console.log('Socket error: ' + err);
 					}
 				});
-	  	}, 60000);
-
-	    var hashrateCheck = setInterval( function () {
-	  		ws.send('{"jsonrpc":"1.0","id":"getstakeinfo","method":"getstakeinfo","params":[]}', function(err) {
-					if (err) {
-						console.log('Socket error: ' + err);
-					}
-				});
-	  	}, 60000);
-
-	    var hashrateCheck = setInterval( function () {
 	  		ws.send('{"jsonrpc":"1.0","id":"estimatestakediff","method":"estimatestakediff","params":[]}', function(err) {
 					if (err) {
 						console.log('Socket error: ' + err);
@@ -137,7 +130,6 @@ var connect = function() {
 	ws.on('message', function(data, flags) {
 
 	    try {
-			console.log(data);
 	    	data = JSON.parse(data);
 	    } catch(e) {
 	    	console.log(e);
@@ -169,6 +161,8 @@ var connect = function() {
 	      updateNetworkHashrate(result);
 		} else if (result && data.id && data.id == 'getstakeinfo') {
 		    updateStake(result);
+		} else if (result && data.id && data.id == 'ticketsmempool') {
+		    updateTicketsMempool(result);
 		} else if (result && data.id && data.id == 'estimatestakediff') {
 	      updateEstimateStake(result);
 		} else if (result && data.id && data.id == 'getpeerinfo') {
@@ -316,6 +310,21 @@ function updateNetworkHashrate (data) {
       console.success('API', 'UPD', 'Updated mininginfo');
       client.write({
         action: 'mininginfo',
+        data: stats
+      });
+    }
+  });
+}
+
+function updateTicketsMempool (data) {
+  Nodes.updateTicketsMempool(data, function (err, stats) {
+    if(err !== null)
+    {
+      console.error('API', 'BLK', 'TicketsMempool error:', err);
+    } else {
+      console.success('API', 'UPD', 'Updated TicketsMempool info');
+      client.write({
+        action: 'tiketsmempool',
         data: stats
       });
     }

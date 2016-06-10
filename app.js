@@ -97,11 +97,6 @@ var connect = function() {
 						console.log('Socket error: ' + err);
 					}
 				});
-			ws.send('{"jsonrpc":"1.0","id":"getticketpoolvalue","method":"getticketpoolvalue","params":[]}', function(err) {
-					if (err) {
-						console.log('Socket error: ' + err);
-					}
-				});
 	  		ws.send('{"jsonrpc":"1.0","id":"ticketsmempool","method":"getrawmempool","params":[false, "tickets"]}', function(err) {
 					if (err) {
 						console.log('Socket error: ' + err);
@@ -124,6 +119,15 @@ var connect = function() {
 					}
 				});
 	  	}, 60000);
+
+	  	// except for getticketpoolvalue which eats a huge amount of CPU, so run it less frequently.
+	  //   var activeNodesInterval = setInterval(function() {
+			// ws.send('{"jsonrpc":"1.0","id":"getticketpoolvalue","method":"getticketpoolvalue","params":[]}', function(err) {
+			// 		if (err) {
+			// 			console.log('Socket error: ' + err);
+			// 		}
+			// 	});
+	  // 	}, 5 * 60000);
 
 	});
 
@@ -264,6 +268,13 @@ function addNewBlock (block) {
 				console.log('Socket error: ' + err);
 			}
 		});
+	// I might want to update getticketpoolvalue when i get a new block too
+	ws.send('{"jsonrpc":"1.0","id":"getticketpoolvalue","method":"getticketpoolvalue","params":[]}', function(err) {
+			if (err) {
+				console.log('Socket error: ' + err);
+			}
+		});
+
 }
 
 function updateSupply (data) {

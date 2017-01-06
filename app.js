@@ -84,7 +84,7 @@ var connect = function() {
 			});
 		
 		// gets block info on restart, not only on new blocks
-		ws.send('{"jsonrpc":"1.0","id":"getbestblock","method":"getbestblock","params":[]}', function(err) {
+                ws.send('{"jsonrpc":"1.0","id":"getbestblockhash","method":"getbestblockhash","params":[]}', function(err) {
 				if (err) {
 					console.log('Socket error: ' + err);
 				}
@@ -139,10 +139,9 @@ var connect = function() {
 	    	console.log(e);
 	    	return;
 	    }
-
 	    /* Get New Block by hash */
 	    if (data.params) {
-	    	ws.send('{"jsonrpc":"1.0","id":"getblock","method":"getblock","params":["'+data.params[0]+'"]}', function(err) {
+	      ws.send('{"jsonrpc":"1.0","id":"getbestblockhash","method":"getbestblockhash","params":[]}', function(err) {
 					if (err) {
 						console.log('Socket error: ' + err);
 					}
@@ -152,9 +151,9 @@ var connect = function() {
 
 		var result = data.result;
 
-		if (result && data.id && data.id == 'getbestblock') {
+		if (result && data.id && data.id == 'getbestblockhash') {
 			// requests last block
-	    	ws.send('{"jsonrpc":"1.0","id":"getblock","method":"getblock","params":["'+result.hash+'"]}', function(err) {
+                  ws.send('{"jsonrpc":"1.0","id":"getblock","method":"getblock","params":["'+result+'"]}', function(err) {
 					if (err) {
 						console.log('Socket error: ' + err);
 					}

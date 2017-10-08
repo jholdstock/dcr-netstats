@@ -19,7 +19,7 @@ npm install
 sudo npm install -g grunt-cli
 ```
 
-##Build the resources
+## Build the resources
 In order to build the static files you have to run grunt tasks which will generate dist directory with the static js and css files, fonts and images.
 
 
@@ -28,7 +28,7 @@ To build the full version run
 grunt
 ```
 
-##Run
+## Run
 
 Change your credentials in `lib/utils/config.json`
 You need to set user, password and full path to the rpc.cert

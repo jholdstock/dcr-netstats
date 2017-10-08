@@ -1,0 +1,4 @@
+build_docker.sh
+node_modules
+npm-debug.log
+dist
